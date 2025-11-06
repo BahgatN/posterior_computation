@@ -1,6 +1,6 @@
-# **Computing posterior kernel density mathematically and numerically**
+# **Posterior Computation**
 
-In this post, you'll learn how to compute the posterior distribution of simple and complex models
+You'll learn how to compute the posterior distribution of simple and complex models
 both mathematically and numerically. Before diving into the
 computations, we'll review essential statistical concepts to build a
 solid understanding of the posterior and Bayesian inference in general.
