@@ -1,0 +1,658 @@
+---
+title: "Computing Posterior (Kernel) Density Mathematically and Numerically"
+author: "Bahgat Nassour"
+date: "2024-08-19"
+output:
+  html_document: default
+editor_options:
+  markdown:
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+In this post, you'll learn how to compute the posterior distribution of simple models
+both mathematically and numerically. Before diving into the
+computations, we'll review essential statistical concepts to build a
+solid understanding of the posterior and Bayesian inference in general.
+We assume that readers are familiar with probability theory, calculus, set theory and the
+R programming language.
+
+## 1. Recap probability axioms
+
+**Axiom 1**: For any event $A \in S$: $$ P(A) \geqslant  0$$.
+
+**Axiom 2**: $$ P(S) = 1 $$.
+
+**Axiom 3**: Let $I$ be a finite or countably infinite index set of
+positive integers, and let $A_{i} : i \in I$ be a collection of disjoint
+events contained in $S$. Then,
+$$P \left( \bigcup_{i \in I} A_i \right) = \sum_{i \in I} P(A_i)$$.
+
+## 2. Random variables and their PMFs and PDFs
+
+## 2.1. Discrete random variables
+
+A random variable is called discrete if its range consists of a
+countable number of elements. The discrete probability *mass* function,
+$f$, for a discrete random variable $X$ is defined as
+$$f(x) =  P(x) \quad \forall x \in R(X)$$ and
+$$f(x) = 0 \quad \forall x \notin R(X)$$
+
+One of the most known discrete PMF is the Bernoulli distribution. The
+probability mass function (PMF) of a Bernoulli distribution is quite
+simple. It is defined for a discrete random variable $X$ that takes the
+value $1$ with probability $\theta$ and the value $0$ with probability
+$1-\theta$.
+
+\newline
+
+Then the PMF can be written as:
+$$f(x; \theta) = \theta^x (1 - \theta)^{1-x} I_{\{0,1\}}(x)$$
+
+```{r x, echo=FALSE}
+par(mfrow = c(1,3))
+theta <- 0.1
+x <- c(0, 1)
+probs <-  c(1 - theta, theta)
+plot(x, probs,
+     type="h",
+     xlim = c(0,1),
+     ylim = c(0,1),
+     xlab=expression(italic(x)),
+     ylab=expression(italic(f(x))),
+     main = bquote(paste("Bernoulli PMF ", italic(theta), " = ", .(theta), sep = "")),
+     col = gray(.5),
+     lwd = 5,
+     xaxt = "n")
+axis(1, at = c(0, 1), labels = c(0, 1))
+theta <- 0.5
+x <- c(0, 1)
+probs <-  c(1 - theta, theta)
+plot(x, probs,
+     type="h",
+     xlim = c(0,1),
+     ylim = c(0,1),
+     xlab=expression(italic(x)),
+     ylab=expression(italic(f(x))),
+     main = bquote(paste("Bernoulli PMF ", italic(theta), " = ", .(theta), sep = "")),
+     col = gray(.5),
+     lwd = 5,
+     xaxt = "n")
+axis(1, at = c(0, 1), labels = c(0, 1))
+theta <- 0.9
+x <- c(0, 1)
+probs <-  c(1 - theta, theta)
+plot(x, probs,
+     type="h",
+     xlim = c(0,1),
+     ylim = c(0,1),
+     xlab=expression(italic(x)),
+     ylab=expression(italic(f(x))),
+     main = bquote(paste("Bernoulli PMF ", italic(theta), " = ", .(theta), sep = "")),
+     col = gray(.5),
+     lwd = 5,
+     xaxt = "n")
+axis(1, at = c(0, 1), labels = c(0, 1))
+```
+
+Another well-known discrete PMF is the Binomial distribution. The
+probability mass function (PMF) of a binomial distribution is defined
+for a discrete random variable $X$ that counts the number of successes
+in $n$ independent Bernoulli trials, each with probability of success.
+The PMF can be written as:
+
+$$f(x; n, \theta) = \binom{n}{x} \theta^x (1 - \theta)^{n-x}$$
+
+```{r, echo=FALSE}
+par(mfrow = c(1,3))
+n <- 10
+theta <- 0.1
+x <- 0:n
+probs <- dbinom(x, size = n, prob = theta)
+plot(x, probs,
+     type = "h",
+     xlim = c(0, n),
+     ylim = c(0, max(probs)),
+     xlab = expression(italic(x)),
+     ylab = expression(italic(f(x))),
+     main = bquote(paste("Binomial PMF ", italic(n), " = ", .(n), " and ", italic(theta), " = ", .(theta))),
+     col = gray(0.5),
+     lwd = 5,
+     xaxt = "n")
+axis(1, at = 0:n, labels = 0:n)
+theta <- 0.5
+x <- 0:n
+probs <- dbinom(x, size = n, prob = theta)
+plot(x, probs,
+     type = "h",
+     xlim = c(0, n),
+     ylim = c(0, max(probs)),
+     xlab = expression(italic(x)),
+     ylab = expression(italic(f(x))),
+     main = bquote(paste("Binomial PMF ", italic(n), " = ", .(n), " and ", italic(theta), " = ", .(theta))),
+     col = gray(0.5),
+     lwd = 5,
+     xaxt = "n")
+axis(1, at = 0:n, labels = 0:n)
+theta <- 0.9
+x <- 0:n
+probs <- dbinom(x, size = n, prob = theta)
+plot(x, probs,
+     type = "h",
+     xlim = c(0, n),
+     ylim = c(0, max(probs)),
+     xlab = expression(italic(x)),
+     ylab = expression(italic(f(x))),
+     main = bquote(paste("Binomial PMF ", italic(n), " = ", .(n), " and ", italic(theta), " = ", .(theta))),
+     col = gray(0.5),
+     lwd = 5,
+     xaxt = "n")
+axis(1, at = 0:n, labels = 0:n)
+```
+
+## 2.2. Continuous random variables
+
+A random variable is called continuous if its range is uncountable
+infinite, and if there exists a non negative-valued function $f(x)$,
+defined for all $x \in (-\infty, \infty)$, such that for any event
+$A \subseteq R(X)$, $$ P_X(A) = \int_{x \in A} f(x) \, dx, $$ and
+$$ f(x) = 0 \quad \forall x \notin R(X). $$ The function $f(x)$ is
+called a continuous probability density function.
+
+One of the most well-known continuous PDFs is the normal distribution.
+The probability density function (PDF) of a normal distribution is
+defined for a continuous random variable $X$ with mean $\mu$ and
+standard deviation $\sigma$. The PDF can be written as:
+
+$$ f(x; \mu, \sigma) = \frac{1}{\sigma \sqrt{2 \pi}} \exp\left( -\frac{(x - \mu)^2}{2 \sigma^2} \right) $$
+
+```{r, echo=FALSE}
+par(mfrow =c(1,1))
+mu <- 0
+sigma <- 1
+x <- seq(-4, 4, length = 100)
+f_x <- dnorm(x, mean = mu, sd = sigma)
+plot(x, f_x,
+     type = "l",
+     xlim = c(-4, 4),
+     ylim = c(0, 0.5),
+     xlab = expression(italic(x)),
+     ylab = expression(italic(f(x))),
+     main = "Normal PDFs",
+     col = gray(.5),
+     lwd = 3)
+mu <- 1
+sigma <- 1
+x <- seq(-4, 4, length = 100)
+f_x <- dnorm(x, mean = mu, sd = sigma)
+lines(x, f_x,
+      type = "l",
+      col = gray(.1),
+      lwd = 3)
+mu <- -1
+sigma <- 1
+x <- seq(-4, 4, length = 100)
+f_x <- dnorm(x, mean = mu, sd = sigma)
+lines(x, f_x,
+      type = "l",
+      col = gray(.9),
+      lwd = 3)
+legend(1.8, 0.49,
+       legend=c(bquote(paste( italic(mu)," = -1, ", italic(sigma), " = 1" )),
+                bquote(paste( italic(mu)," =  0, ", italic(sigma), " = 1" )),
+                bquote(paste( italic(mu)," =  1, ", italic(sigma), " = 1" ))
+                ),
+
+       col=c(gray(.9), gray(.5),gray(.1)),
+       lty= rep(1,3),
+       lwd = 3,
+       cex = 1,
+       box.lty=0)
+```
+
+## 3. Maximum likelihood estimation
+
+## 3.1. Is the likelihood function a valid PDF?
+
+We will start by distinguishing between the likelihood and the
+probability density functions:
+
+-   Again a probability density function (pdf)] is a non-negative
+    function that integrates or sums up to $1$ over the range.
+
+-   The likelihood function is defined as the joint density of the
+    observed data as a function of the parameter. It means it is a
+    function of the parameter only, with the data held as a fixed
+    constant and its integral with respect to the parameter does not
+    necessarily equal 1 (and may not be integrable at all, actually).
+
+To see this, suppose we have a single observation, $x$, from a
+${\rm Bernoulli}(\theta)$ distribution. Then the likelihood function is
+
+$$ L(\theta) = \theta^{x} (1 - \theta)^{1-x} $$
+
+It is a fact that $\int_{0}^{1} L(\theta) d \theta = 1/2$.
+$$\int_{0}^{1} L(\theta) d \theta = \int_{0}^{1} \theta \  d \theta = 1/2 : \theta \in [0,1]$$
+
+Remember the Bernounlli PDF !!!
+$$\sum_{x_{i} \in \{0,1\}} \theta^x_{i} (1 - \theta)^{1-x_{i}} = 1 $$
+
+## 3.2. ML estimator for $n$ Bernoulli trials
+
+Let us begin with this simple example of $10$ Bernoulli Trials, can you
+guess the probability of getting $X = 1$, which we denote as $\theta$
+
+```{r, echo=TRUE}
+x <- c(1,0,1,0,1,0,1,0,1,0)
+```
+
+If your guess it by taking the mean value of the $x$ as
+$$ \hat{\theta} = \frac{\sum_{i=1}^n x_i}{n} $$ you already used the ML
+estimator. To clarify this, let us take this observations one by one. If
+our experiment is a single Bernoulli trial and we observe $X=1$
+(success) then the likelihood function is $L(\theta;x) = \theta$ This
+function reaches its maximum at $\hat{\theta}=1$. And for the second
+observation $X=0$ (failure) then the likelihood is
+$L(\theta;x) = 1-\theta$ , which reaches its maximum at $\theta = 0$
+
+```{r, echo=TRUE}
+par(mfrow = c(1,2))
+theta <- seq(0, 1, 0.001)
+L <- theta
+plot(theta, L, type = "l", xlab=  bquote(paste(italic(theta))),
+     ylab= bquote(paste("L(",italic(theta),")")))
+theta <- seq(0, 1, 0.001)
+L <- 1-theta
+plot(theta, L, type = "l", xlab=  bquote(paste(italic(theta))),
+     ylab= bquote(paste("L(",italic(theta),")")))
+```
+
+Of course, it is silly for us to try to make formal inferences about
+$\theta$ on the basis of a single Bernoulli trial; usually multiple
+trials are available and based on the statistical independence
+assumption we multiply the likelihood function of each observation
+
+## 3.3. Why multiply?
+
+Independence between two events means that the occurrence of one event
+does not affect the likelihood of the occurrence of the another event .
+So for any two events $A$ and $B$ in a sample space $S$ we say that $A$
+and $B$ are independent iff $P(A$ and $B)=P(A\cap B) = P(A)P(B)$ .Now
+for more than two events we say that the events $A_1,A_2,...A_n$ are
+independent iff $P(\underset{i\in I}{\cap A_i})= \prod_{i\in I} P(A_i)$
+for all subsets $I \subset [1,2,...,n]$ .
+
+In the likelihood we suppose that there is a sample $x_1, x_2, ., x_n$
+of $n$ independent and identically distributed observations (iid),
+coming from a distribution with an unknown probability density function
+, that means this joint density function is
+$f(x_1,x_2,...,x_n|\theta) = \prod_{i=1}^{i=n}f(x_i|\theta)$.
+
+## 3.4. Mathematical derivation of the ML estimator for $n$ Bernoulli trials?
+
+For $n$ independent Bernoulli trials, the likelihood function is the
+product of the PMFs for each trial. Let $X_1, X_2, \ldots, X_n$ be the
+outcomes of $n$ trials. The likelihood function $L(\theta)$ is:
+
+$$ L(\theta) = \prod_{i=1}^n \theta^{x_i} (1 - \theta)^{1 - x_i} $$
+
+Since the product of exponentials is the exponential of the sum, we can
+rewrite this as:
+
+$$ L(\theta) = \theta^{\sum_{i=1}^n x_i} (1 - \theta)^{n - \sum_{i=1}^n x_i} $$
+
+The log-likelihood function $l(\theta)$ is the natural logarithm of the
+likelihood function:
+
+$$ l(\theta) = \log L(\theta) = \sum_{i=1}^n x_i \log \theta + (n - \sum_{i=1}^n x_i) \log (1 - \theta) $$
+
+To find the maximum likelihood estimator (MLE) for $\theta$, we take the
+derivative of the log-likelihood function with respect to $\theta$ and
+set it to zero:
+
+$$ \frac{\partial l(\theta)}{\partial \theta} = \frac{\sum_{i=1}^n x_i}{\theta} - \frac{n - \sum_{i=1}^n x_i}{1 - \theta} = 0 $$
+
+Solving for $\theta$:
+
+$$ \hat{\theta} = \frac{\sum_{i=1}^n x_i}{n} $$
+
+The MLE for $\theta$ is the sample mean of the $n$ Bernoulli trials.
+
+## 3.5 ML estimator for $n$ Bernoulli trials in R?
+
+```{r, echo=TRUE}
+
+par(mfrow =c(1,1))
+
+# parameter space
+theta = seq(0, 1, 0.001)
+
+# simulate data
+set.seed(3479)
+n <- 50
+x <- sample(c(0,1), size  = n, replace = T)
+
+# the likelihood function
+L <- theta^(sum(x == 1)) * (1 - theta)^(n-sum(x == 1))
+
+
+plot(theta,
+     L,
+     type = "l",
+     xlab=  bquote(paste(italic(theta))),
+     ylab= bquote(paste("L(",italic(theta),")")),
+     col=c(gray(.5)),
+     lwd = 3,
+     main = paste0("Likelihood Function for ",n, " Bernoulli Trials")
+     )
+
+# the L  function maxima
+max(L)
+
+d <-  cbind(theta,L)
+
+# ML is the mean
+(MLE = d[which.max(d[,2]), 1])
+mean(x)
+
+points(MLE, max(L), pch = 19, col = "red")
+abline(v = MLE, col = "red")
+
+# As for the log-likelihood:
+
+loglik <-  sum(x == 1) * log(theta) + (n - sum(x == 1)) * log(1 - theta)
+d <- cbind(theta,loglik)
+MLE <-  d[which.max(d[,2]), 1]
+MLE
+```
+
+## 3.6. Why log?
+
+The log likelihood is used in statistics and machine learning because of
+calculus. It's easier to take the derivative of a log of a product than
+it is of the product itself Another reason for taking the log is that
+the probabilities involved in likelihood calculations can be very small,
+especially for large datasets. Multiplying many small probabilities can
+lead to numerical underflow, where the product becomes too small to be
+represented accurately by the computer. And the last and most important
+reason is because of the optimization algorithms, such as gradient
+ascent or Newton-Raphson, are more efficient when working with sums
+rather than products. The log-likelihood function facilitates the use of
+these algorithms, making the optimization process more stable and
+faster, **because in many instances there is no closed form, and an
+computational or iterative procedures will be used**, as we will see later.
+
+```{r, echo=TRUE}
+n <- 1000
+true_p <- 0.7
+set.seed(123)
+data <- rbinom(n, size = 1, prob = true_p)
+p_values <- seq(0.01, 0.99, by = 0.01)
+likelihood <- sapply(p_values, function(p) {
+  prod(p^data * (1 - p)^(1 - data))
+})
+
+log_likelihood <- sapply(p_values, function(p) {
+  sum(data * log(p) + (1 - data) * log(1 - p))
+})
+par(mfrow = c(1, 2))
+
+# Plot the likelihood function
+plot(p_values, likelihood, type = "l",  col=c(gray(.5)),
+     lwd = 3,
+     xlab = expression(italic(theta)), ylab = "Likelihood",
+     main = "Likelihood Function")
+
+# Plot the log-likelihood function
+plot(p_values, log_likelihood, type = "l",  col=c(gray(.5)),
+     lwd = 3,
+     xlab = expression(italic(theta)), ylab = "Log-Likelihood",
+     main = "Log-Likelihood Function")
+```
+
+## 6. Bayesian inference
+
+Bayes’ rule formula:
+
+$$
+P(A|B) = \frac{P(A) \cdot P(B|A)}{P(B)}
+$$
+
+This classical formula is fundamental in statistical Bayesian inference theory.
+
+$$
+P(\theta|x) = \frac{P(\theta) \cdot P(x|\theta)}{P(x)}
+$$
+
+Let \( f() \) denote a probability or a probability density function, then:
+
+$$
+f(\theta|x) = \frac{f(\theta) \cdot f(x|\theta)}{f(x)} = \frac{f(\theta) \cdot L(\theta; x)}{\int f(\theta) f(x|\theta) d\theta}
+$$
+
+Under this formula, we can see the first fundamental difference between the Bayesian approach and the frequentist approach. In Bayesian inference, we treat the data \( x \) as fixed and the parameter of interest \( \theta \) as a random variable, which means \( \theta \) has a distribution.
+
+Remember that we have learned in beginner classes of statistics and probability that different definitions of probability have been suggested in the course of the development of probability theory. Two of these definitions are the relative frequency definition of probability and the subjective definition of probability.
+
+So, treating data as fixed and the parameter as random in Bayesian inference will radically change the interpretation of very basic concepts in statistics, such as p-value, hypothesis testing, or confidence interval, etc.
+
+Back to the Formula
+
+- \( f(\theta) \) is the prior distribution.
+- \( f(\theta|x) \) is the posterior distribution.
+- \( L(\theta; x) \) is the likelihood.
+- \( f(x) \) is the marginal distribution of the data \( x \) or the normalizing constant, and it is less important in Bayesian inference since it is a function of the fixed \( x \). 
+
+
+## 7. Posterior Computation Mathematically
+We will stick into our simple Bernoulli Trials model, and we assume the readers are familiar with basic statistical distributions especially for our example the
+ [beta distribution](https://en.wikipedia.org/wiki/Beta_distribution "beta distribution")
+
+
+Consider a random variable \( X \) representing the number of successes in \( n \) Bernoulli trials. The likelihood of observing \( X = k \) successes given the probability \( \theta \) of success is given by the binomial distribution:
+
+\[
+P(X = k | \theta) = \binom{n}{k} \theta^k (1 - \theta)^{n - k}
+\]
+
+Assume a Beta prior distribution on \( \theta \):
+
+\[
+P(\theta) = \text{Beta}(\theta | \alpha, \beta) = \frac{\theta^{\alpha - 1} (1 - \theta)^{\beta - 1}}{B(\alpha, \beta)}
+\]
+
+Where \( B(\alpha, \beta) \) is the Beta function, a normalizing constant for the Beta distribution.
+
+
+The unnormalized posterior distribution is obtained by multiplying the prior and the likelihood:
+
+\[
+P(\theta | X) \propto P(X | \theta) \cdot P(\theta)
+\]
+
+Substituting the likelihood and prior:
+
+\[
+P(\theta | X) \propto \theta^k (1 - \theta)^{n - k} \cdot \theta^{\alpha - 1} (1 - \theta)^{\beta - 1}
+\]
+
+This simplifies to:
+
+\[
+P(\theta | X) \propto \theta^{k + \alpha - 1} (1 - \theta)^{n - k + \beta - 1}
+\]
+
+To normalize the posterior, we need to divide by the evidence (also called the marginal likelihood):
+
+\[
+P(\theta | X) = \frac{P(X | \theta) \cdot P(\theta)}{P(X)}
+\]
+
+Where the evidence \( P(X) \) is given by:
+
+\[
+P(X) = \int_0^1 P(X | \theta) \cdot P(\theta) \, d\theta
+\]
+
+For the Beta-binomial model, the evidence is:
+
+\[
+P(X) = \frac{B(k + \alpha, n - k + \beta)}{B(\alpha, \beta)}
+\]
+
+So the normalized posterior is:
+
+\[
+P(\theta | X) = \frac{\theta^{k + \alpha - 1} (1 - \theta)^{n - k + \beta - 1}}{B(k + \alpha, n - k + \beta)}
+\]
+
+This is a Beta distribution with updated parameters:
+
+\[
+\theta | X \sim \text{Beta}(k + \alpha, n - k + \beta)
+\]
+
+
+Let's visualize the normalized posterior distributions using R.
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+
+n <- 100      # Number of trials
+k <- 40       # Number of successes
+alpha <- 2    # Prior alpha parameter
+beta <- 2     # Prior beta parameter
+
+
+# Define the normalized posterior function (Beta distribution)
+normalized_posterior <- function(theta, k, n, alpha, beta) {
+  dbeta(theta, k + alpha, n - k + beta)
+}
+
+# Parameter space
+theta_vals <- seq(0, 1, length.out = 100)
+
+norm_post_vals <- normalized_posterior(theta_vals, k, n, alpha, beta)
+
+
+par(mfrow = c(1, 1))
+plot(theta_vals, norm_post_vals, type = "l", col=c(gray(.5)),
+     lwd = 3,
+     main = 
+     bquote(paste("Posterior for ", italic(theta), "(Beta PDF) ",)),
+     xlab = expression(theta), ylab = "Density")
+```
+
+## 8. Posterior Computation Numerically
+
+Dropping out the normalizing constant leads the posterior density \( f(\theta|x) \) to lose some properties like integration to 1 (improper density) over the domain of \( \theta \). But this is not a big deal since we are usually not interested in integrating the function but rather in maximizing it. So multiplying this function with the constant does not change the \( \theta \) that corresponds to the maximum point (MAP). In this case, we can say that the posterior is proportional (not equal) to the prior multiplied by the likelihood, i.e. $$ f(\theta|x) \propto f(\theta) \cdot L(\theta; x )$$.
+That means we will get the same estimate either mathematically with proper posterior (with
+ normalizing constant) or numerically with improper posterior (without normalizing constant), this can be done by sampling from the prior and plugging in the sampled values into the likelihood function. Now let us use our Bernoulli trials example in the previous session in order to compute the posterior numerically
+ 
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+
+n <- 100         # Number of trials
+k <- 40          # Number of successes
+alpha <- 2       # Alpha for the Beta prior
+beta <- 2        # Beta for the Beta prior
+
+# Define a grid of theta values (0 to 1)
+theta_vals <- seq(0, 1, length.out = 1000)
+
+# Define the normalized posterior function (Beta distribution)
+normalized_posterior <- function(theta, k, n, alpha, beta) {
+   dbeta(theta, k + alpha, n - k + beta)
+}
+norm_post_vals <- normalized_posterior(theta_vals, k, n, alpha, beta)
+
+# Define the prior (Beta distribution)
+prior <- function(theta, alpha, beta) {
+   dbeta(theta, alpha, beta)
+}
+
+# Define the likelihood (Binomial distribution)
+likelihood <- function(theta, k, n) {
+   dbinom(k, size = n, prob = theta)
+}
+
+# Compute the prior and likelihood for each theta
+prior_vals <- prior(theta_vals, alpha, beta)
+likelihood_vals <- likelihood(theta_vals, k, n)
+
+# Compute the unnormalized posterior (prior * likelihood)
+unnormalized_posterior <- prior_vals * likelihood_vals
+
+# Find MAP
+maxpoint_normalized <- c(theta_vals[which.max(norm_post_vals)],
+                         max(norm_post_vals)
+)
+
+maxpoint_unnormalized <- c(theta_vals[which.max(unnormalized_posterior)],
+                           max(unnormalized_posterior)
+)
+
+# The estimations are identical 
+maxpoint_normalized[1]
+maxpoint_unnormalized[1]
+
+
+par(mfrow = c(1, 2))
+plot(theta_vals, 
+     norm_post_vals, 
+     type = "l", 
+     col=c(gray(.5)),
+     lwd = 3,
+     main = 
+        bquote(paste("Proper Posterior for ", italic(theta), " (Beta PDF) ",)),
+     xlab = expression(theta), ylab = "Density")
+points(maxpoint_normalized[1],
+       maxpoint_normalized[2], pch = 19, col = "red")
+abline(v = maxpoint_normalized[1], col = "red")
+
+plot(theta_vals, 
+     unnormalized_posterior, 
+     type = "l", 
+     col=c(gray(.5)),
+     lwd = 3,
+     main = 
+        bquote(paste("Improper Posterior for ", italic(theta))),
+     xlab = expression(theta), ylab = "Density")
+
+points(maxpoint_unnormalized[1],
+       maxpoint_unnormalized[2], pch = 19, col = "red")
+abline(v = maxpoint_unnormalized[1], col = "red")
+```
+
+## 9. Repository 
+you can get the code used to generate all the plots and computation from my
+ [GitHub repository](https://github.com/BahgatN/posterior_computation "GitHub repository")
+
+
+## 10. Beyond simple models
+In order to understand how the Bayesian modelling works in more complex models we need to understand and recap some concepts in mathematics and computational statistic like
+finding functions roots, series convergence and divergence, central limit theorem and law of large numbers, sampling methods and how computers generate random numbers.
+
+\newline
+
+So that we will move to more advanced and practical Bayesian models with the following sections:
+
+- Numerical optimization
+- Newton-Raphson optimization algorithm for maximum likelihood function
+- Convergence and divergence in mathematics
+- Random sampling methods
+- Monte Carlo integration methods
+- Markov chains
+- Monte Carlo Markov chains
+- Metropolis-Hastings and Gibbs sampler
+- Bayesian regression models in Stan, R and Python
+
+## 11. References
+-  [Mathematical Statistics for Economics and Business](https://www.amazon.de/-/en/Ron-C-Mittelhammer/dp/1489989501 "Mathematical Statistics for Economics and Business")
+-  [A First Course in Bayesian Statistical Methods](https://link.springer.com/book/10.1007/978-0-387-92407-6 "A First Course in Bayesian Statistical Methods")
+-  [Notes on Statistics, Probability and Mathematics](https://rinterested.github.io/statistics/mle.html "Notes on Statistics, Probability and Mathematicss")
+-  [Marco's Answer on Cross Validated](https://stats.stackexchange.com/questions/31238/what-is-the-reason-that-a-likelihood-function-is-not-a-pdf "Marco's Answer on Cross Validated")
+-  [Bahgat's Answer on Cross Validated](https://stats.stackexchange.com/questions/211848/likelihood-why-multiply#:~:text=The%20goal%20of%20the%20maximum,multiply%20the%20probabilties%20of%20ocurrence. "Bahgat's Answer on Cross Validated")
+
+
